@@ -173,9 +173,11 @@ if(BUILD_STANDALONE)
     QtMultimedia/${_lib_prefix}declarative_multimedia
     QtSensors/${_lib_prefix}declarative_sensors)
 
+  # TODO Double check for ubuntutouch, we may need qtquickcontrols2/templates2!
   if(NOT SAILFISHOS AND NOT UBUNTUTOUCH)
     list(APPEND _qml_plugins
-      QtQuick/Controls/${_lib_prefix}qtquickcontrolsplugin
+      QtQuick/Controls/${_lib_prefix}qtquickcontrols2plugin
+      QtQuick/Templates.2/${_lib_prefix}qtquicktemplates2plugin
       QtQuick/Layouts/${_lib_prefix}qquicklayoutsplugin)
   endif()
 
