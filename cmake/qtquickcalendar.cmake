@@ -25,37 +25,52 @@ if(WIN32)
 elseif(CMAKE_HOST_APPLE)
   set(_calendar_library_dir "")
   set(_calendar_library_file "libqtquickcalendarplugin.dylib")
+elseif(ANDROID AND Qt5Widgets_VERSION_STRING VERSION_GREATER_EQUAL "5.14.0")
+  set(_calendar_library_dir "qml/QtQuick/Calendar/")
+  set(_calendar_library_file "libqml_QtQuick_Calendar_qtquickcalendarplugin_${ANDROID_ABI}.so")
 else()
   set(_calendar_library_dir "qml/QtQuick/Calendar/")
   set(_calendar_library_file "libqtquickcalendarplugin.so")
 endif()
 set(_calendar_install_dir ${CMAKE_BINARY_DIR}/lib/qml/QtQuick/Calendar)
 
+if(ANDROID AND Qt5Widgets_VERSION_STRING VERSION_GREATER_EQUAL "5.14.0")
+  # Only build the necessary architecture for calendar
+  # Capitalize first letter of the abi...
+  string(SUBSTRING ${ANDROID_ABI} 0 1 FIRST_LETTER)
+  string(TOUPPER ${FIRST_LETTER} FIRST_LETTER)
+  string(REGEX REPLACE "^.(.*)" "${FIRST_LETTER}\\1" ANDROID_ABI_CAP "${ANDROID_ABI}")
+  set(CALENDAR_MAKE_PROGRAM ${CALENDAR_MAKE_PROGRAM} -f Makefile.${ANDROID_ABI_CAP})
+  # I didn't find a better way to copy the libraries to the lib folder only on Android when doing an aab package...
+  set(EXTRA_INSTALL_ANDROID_CALENDAR ${CMAKE_COMMAND} -E make_directory ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} && ${CMAKE_COMMAND} -E copy ${_calendar_library_dir}${_calendar_library_file} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} && )
+endif()
+
 # for visual studio, we need to create a vcxproj
 if(WIN32 AND NOT MINGW)
   set(_qmake_options -spec win32-msvc -tp vc -r) # Needs to be recursive, else it does not generate .vcxproj
-  set(CALENDAR_BUILD_COMMAND ${CMAKE_MAKE_PROGRAM} /p:Configuration=Release /p:Platform=x64)
+  set(CALENDAR_MAKE_PROGRAM ${CMAKE_MAKE_PROGRAM} /p:Configuration=Release /p:Platform=x64)
 else()
   set(_qmake_options "")
-  set(CALENDAR_BUILD_COMMAND "${CMAKE_MAKE_PROGRAM}")
+  set(CALENDAR_MAKE_PROGRAM "${CMAKE_MAKE_PROGRAM}")
 endif()
 # Ninja is not supported by qmake.
 # In case Ninja is set as generator, use make on Linux, nmake on Windows
 if(${CMAKE_GENERATOR} MATCHES "Ninja")
   if(WIN32)
-    set(CALENDAR_BUILD_COMMAND "nmake")
+    set(CALENDAR_MAKE_PROGRAM "nmake")
   else()
-    set(CALENDAR_BUILD_COMMAND "make")
+    set(CALENDAR_MAKE_PROGRAM "make")
   endif()
 endif()
+
 ExternalProject_Add(qtquick_calendar_project
   DOWNLOAD_COMMAND ""
   SOURCE_DIR ${_calendar_source_dir}
   CONFIGURE_COMMAND ${_qmake_program} ${_qmake_options} ${_calendar_source_dir}/qtquickcalendar.pro
-  BUILD_COMMAND ${CALENDAR_BUILD_COMMAND}
+  BUILD_COMMAND ${CALENDAR_MAKE_PROGRAM}
   INSTALL_DIR ${_calendar_install_dir}
   # TODO install the .qml instead of qmlc?
-  INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${_calendar_library_dir}${_calendar_library_file} ${_calendar_library_dir}qmldir ${_calendar_qml_files_dir}DayOfWeekRow.qml ${_calendar_qml_files_dir}MonthGrid.qml ${_calendar_qml_files_dir}WeekNumberColumn.qml ${_calendar_install_dir}
+  INSTALL_COMMAND ${EXTRA_INSTALL_ANDROID_CALENDAR} ${CMAKE_COMMAND} -E copy ${_calendar_library_dir}${_calendar_library_file} ${_calendar_qml_files_dir}qmldir ${_calendar_qml_files_dir}DayOfWeekRow.qml ${_calendar_qml_files_dir}MonthGrid.qml ${_calendar_qml_files_dir}WeekNumberColumn.qml ${_calendar_install_dir}
   )
 
 add_library(qtquickcalendar SHARED IMPORTED)
